@@ -1,0 +1,60 @@
+{
+  "name": "stoic-video-capture",
+  "productName": "Stoic Video Capture",
+  "version": "0.1.0",
+  "description": "Gameplay and screen capture for Windows",
+  "main": "src/main/main.js",
+  "author": "Matt Thomas",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/**/*.test.js\"",
+    "fetch-ffmpeg": "node scripts/fetch-ffmpeg.js",
+    "dist:win": "node scripts/fetch-ffmpeg.js && electron-builder --win --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.stoic.videocapture",
+    "productName": "Stoic Video Capture",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/ffmpeg",
+        "to": "ffmpeg",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Stoic Video Capture",
+      "artifactName": "Stoic-Video-Capture-Setup-${version}.${ext}"
+    }
+  }
+}

@@ -1,0 +1,64 @@
+name: Build Windows installer
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Download FFmpeg
+        run: npm run fetch-ffmpeg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check FFmpeg capabilities
+        shell: pwsh
+        run: |
+          $ff = "resources/ffmpeg/ffmpeg.exe"
+          & $ff -hide_banner -version | Select-Object -First 1
+          $filters = & $ff -hide_banner -filters 2>&1 | Out-String
+          if ($filters -notmatch 'ddagrab') { throw 'ddagrab missing from FFmpeg build' }
+          $enc = & $ff -hide_banner -encoders 2>&1 | Out-String
+          foreach ($e in 'h264_nvenc','h264_amf','h264_qsv','libx264') {
+            if ($enc -notmatch $e) { throw "$e missing from FFmpeg build" }
+          }
+          # Exercise the software path end to end: record a test pattern, then mux.
+          & $ff -hide_banner -loglevel error -y -f lavfi -i testsrc2=s=1280x720:r=60 -t 2 -c:v libx264 -preset superfast -crf 21 -pix_fmt yuv420p -an test.mkv
+          & $ff -hide_banner -loglevel error -y -f lavfi -i sine=f=440:d=2 -c:a libopus test.webm
+          & $ff -hide_banner -loglevel error -y -i test.mkv -i test.webm -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -movflags +faststart test.mp4
+          if (-not (Test-Path test.mp4)) { throw 'mux failed' }
+
+      - name: Build installer
+        run: npx electron-builder --win --x64 --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Stoic-Video-Capture-Setup
+          path: dist/*.exe
+          if-no-files-found: error
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.exe

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; media-src 'self' blob: mediastream:">
+<title>Stoic Video Capture</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">S</div>
+      <div>
+        <div class="brand-name">Stoic</div>
+        <div class="brand-sub">Video Capture</div>
+      </div>
+    </div>
+    <div class="section-label">Mode</div>
+    <nav id="modes" class="modes"></nav>
+    <div class="sidebar-foot">
+      <div id="caps" class="caps">Checking your PC…</div>
+      <div id="version" class="version"></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section class="hero">
+      <button id="recordBtn" class="record-btn" disabled>
+        <span class="dot"></span><span id="recordLabel">Start recording</span>
+      </button>
+      <div class="hero-info">
+        <div id="timer" class="timer">00:00:00</div>
+        <div id="status" class="status">Loading…</div>
+      </div>
+      <div class="hotkey-hint">Hotkey: <kbd id="hotkeyHint">F9</kbd></div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Capture</h2>
+        <div class="segmented" id="sourceGroup">
+          <button data-source="screen">Full screen</button>
+          <button data-source="region">Region</button>
+          <button data-source="camera">Camera</button>
+        </div>
+        <label class="field" id="displayField">
+          <span>Display</span>
+          <select id="display"></select>
+        </label>
+        <div class="field" id="regionField">
+          <span>Area</span>
+          <div class="row">
+            <div id="regionText" class="muted">No area selected</div>
+            <button id="pickRegion" class="btn">Select area</button>
+          </div>
+        </div>
+        <label class="field" id="cameraField">
+          <span>Camera / capture card</span>
+          <div class="row">
+            <select id="camera"></select>
+            <button id="refreshCameras" class="btn icon" title="Refresh">⟳</button>
+          </div>
+        </label>
+        <label class="check" id="cursorField">
+          <input type="checkbox" id="cursor"> Show mouse cursor
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>Quality</h2>
+        <label class="field">
+          <span>Resolution</span>
+          <select id="resolution">
+            <option value="native">Native (same as source)</option>
+            <option value="720p">720p HD</option>
+            <option value="1080p">1080p Full HD</option>
+            <option value="1440p">1440p QHD</option>
+            <option value="2160p">2160p 4K</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Frame rate</span>
+          <select id="fps">
+            <option value="30">30 fps</option>
+            <option value="60">60 fps</option>
+            <option value="120">120 fps</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Quality</span>
+          <select id="quality">
+            <option value="low">Low (small files)</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="ultra">Ultra (large files)</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Encoder</span>
+          <select id="encoder">
+            <option value="auto">Automatic (best available)</option>
+            <option value="h264_nvenc">NVIDIA (NVENC)</option>
+            <option value="h264_amf">AMD (AMF)</option>
+            <option value="h264_qsv">Intel (Quick Sync)</option>
+            <option value="libx264">CPU (x264)</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>Audio</h2>
+        <label class="check"><input type="checkbox" id="systemAudio"> Game / system audio</label>
+        <label class="field slider">
+          <span>Volume <output id="systemVolumeOut">100%</output></span>
+          <input type="range" id="systemVolume" min="0" max="2" step="0.05">
+        </label>
+        <label class="check"><input type="checkbox" id="mic"> Microphone</label>
+        <label class="field">
+          <span>Microphone device</span>
+          <select id="micDeviceId"></select>
+        </label>
+        <label class="field slider">
+          <span>Volume <output id="micVolumeOut">100%</output></span>
+          <input type="range" id="micVolume" min="0" max="2" step="0.05">
+        </label>
+        <details>
+          <summary>Advanced</summary>
+          <label class="field">
+            <span>Audio sync adjust (ms, + if audio is late)</span>
+            <input type="number" id="audioOffsetMs" step="10">
+          </label>
+        </details>
+      </section>
+
+      <section class="card">
+        <h2>Output</h2>
+        <div class="field">
+          <span>Save recordings to</span>
+          <div class="row">
+            <div id="outputDir" class="muted path"></div>
+            <button id="chooseFolder" class="btn">Change</button>
+          </div>
+        </div>
+        <label class="field">
+          <span>Start / stop hotkey</span>
+          <input type="text" id="hotkey" placeholder="Click and press keys" readonly>
+        </label>
+        <button id="openFolder" class="btn wide">Open recordings folder</button>
+      </section>
+    </div>
+
+    <section class="card recordings">
+      <div class="card-head">
+        <h2>Recent recordings</h2>
+        <button id="refreshRecordings" class="btn icon" title="Refresh">⟳</button>
+      </div>
+      <ul id="recordings"></ul>
+    </section>
+  </main>
+</div>
+<div id="toast" class="toast"></div>
+<script src="audio.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
