@@ -87,6 +87,7 @@ function textFilter(t, { height, fontDir, platform }) {
   const opts = [
     `fontfile=${filterPath(fontPath(t.font, fontDir, platform))}`,
     `textfile=${filterPath(t.textFile)}`,
+    'expansion=none', // show % and other characters literally
     `fontsize=${size}`,
     `fontcolor=${hex(t.color)}`,
     `x='${x}'`,
