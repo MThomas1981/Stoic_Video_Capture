@@ -54,7 +54,7 @@ test('export joins clips, applies speed and mixes music', () => {
   });
   assert.equal(outputDuration, 2.5);
   const fc = after(args, '-filter_complex');
-  assert.match(fc, /concat=n=2:v=1:a=1\[vcat\]\[acat\]/);
+  assert.match(fc, /concat=n=2:v=1:a=1\[vj\]\[aj\]/);
   assert.match(fc, /setpts=PTS\/2,fps=60/);
   assert.match(fc, /atempo=2,volume=0.5/);
   assert.match(fc, /adelay=delays=1000:all=1/);

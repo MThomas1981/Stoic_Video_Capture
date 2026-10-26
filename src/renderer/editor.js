@@ -19,7 +19,9 @@
     zoom: 1,
     thumbs: [],
     exporting: false,
+    effects: JSON.parse(JSON.stringify(window.Flavors.DEFAULT_EFFECTS)),
   };
+  const ov = () => TM.transitionLength(ed.clips, ed.effects.transition);
 
   const mediaUrl = (p) => `media://local/${encodeURIComponent(p)}`;
   const fps = () => ed.file?.fps || 30;
@@ -59,6 +61,7 @@
       Object.assign(ed, {
         file: info, clips: [], markers: [], inPoint: null, outPoint: null, speed: 1, thumbs: [], zoom: 1,
       });
+      ed.effects.texts = [];
       $('zoom').value = 0;
       $('editorEmpty').classList.add('hidden');
       $('editor').classList.remove('hidden');
@@ -69,6 +72,7 @@
       video.load();
       setSpeed(1);
       renderAll();
+      document.dispatchEvent(new Event('editor-file'));
       requestAnimationFrame(layoutTimeline);
       const count = Math.min(60, Math.max(12, Math.round(info.duration / 5)));
       ed.thumbs = await window.api.edit.thumbs(filePath, info.duration, count);
@@ -155,7 +159,7 @@
 
   $('exportChapters').onclick = async () => {
     if (!ed.markers.length) { toast('Add some markers first.', true); return; }
-    const text = TM.chaptersText(ed.markers, ed.clips, ed.speed, dur());
+    const text = TM.chaptersText(ed.markers, ed.clips, ed.speed, dur(), ov());
     try { await navigator.clipboard.writeText(text); } catch { /* clipboard optional */ }
     const saved = await window.api.edit.saveText({
       suggestedName: `${ed.file.name.replace(/\.[^.]+$/, '')} chapters.txt`, text,
@@ -208,7 +212,7 @@
   };
   $('musicAtPlayhead').onclick = () => {
     if (!ed.music) return;
-    const t = TM.sourceToOutput(video.currentTime, ed.clips, ed.speed, dur());
+    const t = TM.sourceToOutput(video.currentTime, ed.clips, ed.speed, dur(), ov());
     if (t === null) { toast('The playhead is outside your clips.', true); return; }
     ed.music.startAt = t;
     renderMusic();
@@ -226,7 +230,7 @@
   /** Keep the music preview roughly in step with the edited timeline. */
   function syncMusic() {
     if (!ed.music || !music.src) return;
-    const outT = TM.sourceToOutput(video.currentTime, ed.clips, ed.speed, dur());
+    const outT = TM.sourceToOutput(video.currentTime, ed.clips, ed.speed, dur(), ov());
     const mt = outT === null ? -1 : outT - ed.music.startAt;
     const playing = !video.paused && mt >= 0 && (ed.music.loop || mt < (music.duration || Infinity));
     if (!playing) { if (!music.paused) music.pause(); return; }
@@ -444,7 +448,7 @@
   }
 
   function renderMarkersHint() {
-    const outside = ed.markers.filter((m) => TM.sourceToOutput(m.time, ed.clips, ed.speed, dur()) === null).length;
+    const outside = ed.markers.filter((m) => TM.sourceToOutput(m.time, ed.clips, ed.speed, dur(), ov()) === null).length;
     $('markersHint').textContent = !ed.markers.length
       ? 'Press M or ◆ Marker to timestamp a moment.'
       : outside ? `${outside} marker${outside > 1 ? 's are' : ' is'} outside your clips and won't appear in chapters.`
@@ -464,7 +468,7 @@
 
   function renderSummary() {
     if (!ed.file) return;
-    const out = TM.outputDuration(ed.clips, ed.speed, dur());
+    const out = TM.outputDuration(ed.clips, ed.speed, dur(), ov());
     $('exportSummary').textContent = `Final length ${TM.short(out)}`
       + `${ed.clips.length ? ` from ${ed.clips.length} clip${ed.clips.length > 1 ? 's' : ''}` : ''}`
       + `${ed.speed !== 1 ? ` at ${ed.speed}×` : ''}${ed.music ? ' with music' : ''}.`;
@@ -549,11 +553,14 @@
     try {
       const res = await window.api.edit.export({
         input: ed.file.path,
-        probe: { duration: ed.file.duration, fps: ed.file.fps, hasAudio: ed.file.hasAudio },
+        probe: {
+          duration: ed.file.duration, fps: ed.file.fps, hasAudio: ed.file.hasAudio, width: ed.file.width, height: ed.file.height,
+        },
         clips: ed.clips,
         speed: ed.speed,
         originalVolume: ed.originalVolume,
         music: ed.music,
+        effects: ed.effects,
         quality: $('exportQuality').value,
       });
       if (res) {
@@ -570,4 +577,15 @@
     }
   };
   $('cancelExport').onclick = () => window.api.edit.cancel();
+
+  // Shared with editor-fx.js (style, text and logo panels).
+  window.EditorBridge = {
+    ed,
+    video,
+    toast,
+    outputNow: () => TM.sourceToOutput(video.currentTime, ed.clips, ed.speed, dur(), ov()),
+    outputDuration: () => TM.outputDuration(ed.clips, ed.speed, dur(), ov()),
+    refresh: () => { renderSummary(); renderMarkersHint(); renderClips(); },
+  };
+  document.dispatchEvent(new Event('editor-ready'));
 })();

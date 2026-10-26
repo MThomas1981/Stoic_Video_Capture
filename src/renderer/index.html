@@ -182,8 +182,16 @@
 
         <div class="editor-body">
           <div class="player-col">
-            <div class="player">
+            <div class="player" id="player">
               <video id="video" preload="auto"></video>
+              <div class="fx-overlay" id="fxOverlay">
+                <div class="fx-vignette" id="fxVignette"></div>
+                <div class="fx-letterbox top" id="fxLbTop"></div>
+                <div class="fx-letterbox bottom" id="fxLbBottom"></div>
+                <div class="fx-texts" id="fxTexts"></div>
+                <img class="fx-logo" id="fxLogo" alt="">
+                <div class="fx-border" id="fxBorder"></div>
+              </div>
             </div>
 
             <div class="transport">
@@ -232,6 +240,14 @@
           </div>
 
           <aside class="side-col">
+            <div class="panel-tabs" id="panelTabs">
+              <button data-panel="cut" class="active">Cut</button>
+              <button data-panel="style">Style</button>
+              <button data-panel="text">Text</button>
+              <button data-panel="audio">Audio</button>
+            </div>
+
+            <div class="panel" data-panel="cut">
             <section class="card">
               <div class="card-head"><h2>Clips</h2><span class="muted small" id="clipsTotal"></span></div>
               <div class="muted small" id="inoutText">In: – · Out: –</div>
@@ -258,7 +274,73 @@
                 <button data-speed="2">2×</button><button data-speed="4">4×</button>
               </div>
             </section>
+            </div>
 
+            <div class="panel hidden" data-panel="style">
+            <section class="card">
+              <h2>Flavor packs</h2>
+              <div class="flavors" id="flavors"></div>
+            </section>
+            <section class="card">
+              <h2>Transitions</h2>
+              <label class="field"><span>Between clips</span><select id="trType"></select></label>
+              <label class="field slider"><span>Length <output id="trDurOut">0.6 s</output></span>
+                <input type="range" id="trDur" min="0.2" max="2" step="0.05" value="0.6"></label>
+              <label class="check"><input type="checkbox" id="trFadeEnds"> Fade in at the start and out at the end</label>
+              <div class="muted small" id="trHint"></div>
+            </section>
+            <section class="card">
+              <h2>Border</h2>
+              <label class="field"><span>Style</span><select id="bdStyle"></select></label>
+              <div class="row two" id="bdColors">
+                <label class="field"><span>Color</span><input type="color" id="bdColor" value="#4ade80"></label>
+                <label class="field" id="bdColor2Field"><span>Second color</span><input type="color" id="bdColor2" value="#3b82f6"></label>
+              </div>
+              <label class="field slider"><span>Thickness <output id="bdSizeOut">3%</output></span>
+                <input type="range" id="bdSize" min="0.5" max="8" step="0.5" value="3"></label>
+            </section>
+            <section class="card">
+              <div class="card-head"><h2>Look</h2><button class="btn small-btn" id="lookReset">Reset</button></div>
+              <label class="field slider"><span>Saturation <output id="lkSatOut"></output></span>
+                <input type="range" id="lkSat" min="0" max="2" step="0.05"></label>
+              <label class="field slider"><span>Contrast <output id="lkConOut"></output></span>
+                <input type="range" id="lkCon" min="0.5" max="1.6" step="0.02"></label>
+              <label class="field slider"><span>Brightness <output id="lkBriOut"></output></span>
+                <input type="range" id="lkBri" min="-0.3" max="0.3" step="0.01"></label>
+              <label class="field slider"><span>Warmth <output id="lkWarmOut"></output></span>
+                <input type="range" id="lkWarm" min="-1" max="1" step="0.05"></label>
+              <label class="field slider"><span>Film grain <output id="lkGrainOut"></output></span>
+                <input type="range" id="lkGrain" min="0" max="1" step="0.05"></label>
+              <div class="toggles">
+                <label class="check"><input type="checkbox" id="lkVignette"> Vignette</label>
+                <label class="check"><input type="checkbox" id="lkLetterbox"> Letterbox</label>
+                <label class="check"><input type="checkbox" id="lkSharpen"> Sharpen</label>
+                <label class="check"><input type="checkbox" id="lkVhs"> VHS bleed</label>
+              </div>
+            </section>
+            </div>
+
+            <div class="panel hidden" data-panel="text">
+            <section class="card">
+              <div class="card-head"><h2>Text</h2><button class="btn small-btn primary" id="addText">+ Text at playhead</button></div>
+              <div class="muted small" id="textHint">Titles and captions appear in the final video. Times follow your clips and speed.</div>
+              <div class="text-items" id="textItems"></div>
+            </section>
+            <section class="card">
+              <div class="card-head"><h2>Logo / image</h2><button class="btn small-btn" id="pickLogo">Add image…</button></div>
+              <div id="logoBox" class="hidden">
+                <div class="row"><div class="muted path" id="logoName"></div>
+                  <button class="btn icon" id="removeLogo" title="Remove image">✕</button></div>
+                <label class="field"><span>Position</span><select id="logoPos"></select></label>
+                <label class="field slider"><span>Size <output id="logoScaleOut">15%</output></span>
+                  <input type="range" id="logoScale" min="3" max="60" step="1" value="15"></label>
+                <label class="field slider"><span>Opacity <output id="logoOpacityOut">90%</output></span>
+                  <input type="range" id="logoOpacity" min="0.05" max="1" step="0.05" value="0.9"></label>
+              </div>
+            </section>
+            </div>
+
+            <div class="panel hidden" data-panel="audio">
             <section class="card">
               <div class="card-head"><h2>Music</h2>
                 <button class="btn small-btn" id="pickMusic">Add music…</button></div>
@@ -280,6 +362,7 @@
                 <input type="range" id="origVol" min="0" max="2" step="0.05" value="1"></label>
               <audio id="musicPreview" preload="auto"></audio>
             </section>
+            </div>
 
             <section class="card">
               <h2>Export</h2>
@@ -305,6 +388,8 @@
 <script src="audio.js"></script>
 <script src="app.js"></script>
 <script src="timeline-math.js"></script>
+<script src="flavors.js"></script>
+<script src="editor-fx.js"></script>
 <script src="editor.js"></script>
 </body>
 </html>

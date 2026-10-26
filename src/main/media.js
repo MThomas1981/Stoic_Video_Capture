@@ -6,6 +6,7 @@ const os = require('os');
 const path = require('path');
 const { ffmpegPath, run } = require('./ffmpeg');
 const { buildExportArgs } = require('./edit-args');
+const { FONTS } = require('../renderer/flavors');
 
 function ffprobePath() {
   const ff = ffmpegPath();
@@ -72,9 +73,34 @@ async function thumbnails(file, duration, count = 24, height = 72) {
 
 let currentExport = null;
 
+function fontDir() {
+  if (process.platform === 'win32') return path.join(process.env.WINDIR || 'C:\\Windows', 'Fonts');
+  return '/usr/share/fonts/truetype/dejavu';
+}
+
 function exportEdit(opts, onProgress) {
   if (currentExport) return Promise.reject(new Error('An export is already running'));
-  const { args, outputDuration, encoder } = buildExportArgs(opts);
+  // drawtext reads each caption from a file, which avoids escaping problems.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stoic-export-'));
+  const effects = opts.effects ? {
+    ...opts.effects,
+    texts: (opts.effects.texts || []).map((t, i) => {
+      const textFile = path.join(tmp, `text${i}.txt`);
+      fs.writeFileSync(textFile, String(t.text || ''));
+      // Fall back to the bold font if this PC lacks the chosen one.
+      const def = FONTS[t.font] || FONTS.bold;
+      const file = path.join(fontDir(), process.platform === 'win32' ? def.win : def.linux);
+      return { ...t, font: fs.existsSync(file) ? t.font : 'bold', textFile };
+    }),
+  } : undefined;
+  let built;
+  try {
+    built = buildExportArgs({ ...opts, effects, fontDir: fontDir(), platform: process.platform });
+  } catch (e) {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    return Promise.reject(e);
+  }
+  const { args, outputDuration, encoder } = built;
   return new Promise((resolve, reject) => {
     const proc = spawn(ffmpegPath(), args, { windowsHide: true });
     currentExport = proc;
@@ -88,10 +114,11 @@ function exportEdit(opts, onProgress) {
         onProgress?.(Math.min(1, t / outputDuration));
       }
     });
-    proc.on('error', (e) => { currentExport = null; reject(e); });
+    proc.on('error', (e) => { currentExport = null; fs.rmSync(tmp, { recursive: true, force: true }); reject(e); });
     proc.on('close', (code) => {
       const cancelled = proc.cancelled;
       currentExport = null;
+      fs.rmSync(tmp, { recursive: true, force: true });
       if (cancelled) {
         fs.rmSync(opts.outPath, { force: true });
         return reject(new Error('Export cancelled'));

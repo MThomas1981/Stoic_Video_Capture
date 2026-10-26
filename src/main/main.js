@@ -19,6 +19,7 @@ const MIME = {
   '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.mkv': 'video/x-matroska',
   '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.aac': 'audio/aac',
   '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.flac': 'audio/flac',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif',
 };
 
 function serveMedia(request) {
@@ -235,6 +236,13 @@ function registerIpc() {
     const res = await dialog.showOpenDialog(mainWindow, {
       properties: ['openFile'],
       filters: [{ name: 'Audio', extensions: ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'] }],
+    });
+    return res.canceled ? null : res.filePaths[0];
+  });
+  ipcMain.handle('edit:pick-image', async () => {
+    const res = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }],
     });
     return res.canceled ? null : res.filePaths[0];
   });

@@ -62,36 +62,49 @@
     return clips && clips.length ? clips : [{ start: 0, end: duration }];
   }
 
+  /** Transition length used between clips (matches the export builder). */
+  function transitionLength(clips, transition) {
+    if (!transition || transition.type === 'none' || !clips || clips.length < 2) return 0;
+    const shortest = Math.min(...clips.map((c) => c.end - c.start));
+    return Math.max(0.1, Math.min(Number(transition.duration) || 0.6, shortest * 0.45));
+  }
+
+  // `overlap` is the transition length: each clip after the first starts
+  // that much earlier because it blends over the end of the previous one.
+
   /** Where a moment of the recording ends up in the exported video (null if cut out). */
-  function sourceToOutput(t, clips, speed, duration) {
+  function sourceToOutput(t, clips, speed, duration, overlap = 0) {
     let acc = 0;
-    for (const c of effectiveClips(clips, duration)) {
+    const list = effectiveClips(clips, duration);
+    for (let i = 0; i < list.length; i += 1) {
+      const c = list[i];
       if (t >= c.start && t <= c.end) return (acc + (t - c.start)) / speed;
-      acc += c.end - c.start;
+      acc += c.end - c.start - (list.length > 1 ? overlap : 0);
     }
     return null;
   }
 
   /** The recording moment shown at output time `t`. */
-  function outputToSource(t, clips, speed, duration) {
+  function outputToSource(t, clips, speed, duration, overlap = 0) {
     let remaining = t * speed;
     const list = effectiveClips(clips, duration);
     for (const c of list) {
-      const len = c.end - c.start;
+      const len = c.end - c.start - (list.length > 1 ? overlap : 0);
       if (remaining <= len) return c.start + remaining;
       remaining -= len;
     }
     return list[list.length - 1].end;
   }
 
-  function outputDuration(clips, speed, duration) {
-    return effectiveClips(clips, duration).reduce((s, c) => s + (c.end - c.start), 0) / speed;
+  function outputDuration(clips, speed, duration, overlap = 0) {
+    const list = effectiveClips(clips, duration);
+    return (list.reduce((s, c) => s + (c.end - c.start), 0) - overlap * (list.length - 1)) / speed;
   }
 
   /** YouTube chapters text from markers, in exported-video time. */
-  function chaptersText(markers, clips, speed, duration) {
+  function chaptersText(markers, clips, speed, duration, overlap = 0) {
     const rows = markers
-      .map((m) => ({ t: sourceToOutput(m.time, clips, speed, duration), label: m.label || 'Chapter' }))
+      .map((m) => ({ t: sourceToOutput(m.time, clips, speed, duration, overlap), label: m.label || 'Chapter' }))
       .filter((r) => r.t !== null)
       .sort((a, b) => a.t - b.t);
     // YouTube requires the first chapter at 0:00.
@@ -101,7 +114,7 @@
 
   const api = {
     frameAt, timeOfFrame, timecode, short, chapterTime, parseTime,
-    sourceToOutput, outputToSource, outputDuration, chaptersText,
+    sourceToOutput, outputToSource, outputDuration, chaptersText, transitionLength,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TimelineMath = api;

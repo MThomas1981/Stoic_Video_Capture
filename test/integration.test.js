@@ -34,5 +34,25 @@ test('export pipeline produces the expected length', async (t) => {
   const outInfo = await media.probe(out);
   assert.ok(Math.abs(outInfo.duration - 3.5 / 1.5) < 0.1, `duration ${outInfo.duration}`);
   assert.ok(outInfo.hasAudio);
+
+  // Every flavor, with captions (tricky characters) and a logo, through real FFmpeg.
+  const Flavors = require('../src/renderer/flavors');
+  const logo = path.join(dir, 'logo.png');
+  await run(['-y', '-f', 'lavfi', '-i', 'color=c=0x4ade80:s=200x80', '-frames:v', '1', logo]);
+  for (const key of Object.keys(Flavors.FLAVORS)) {
+    const effects = Flavors.applyFlavor({
+      ...Flavors.DEFAULT_EFFECTS,
+      texts: [{ text: "It's 100%: GG, wp!", start: 0.2, end: 2, position: 'bottom', size: 'l' }],
+      logo: { path: logo, position: 'top-right', scale: 15, opacity: 0.8 },
+    }, key);
+    const fxOut = path.join(dir, `fx-${key}.mp4`);
+    await media.exportEdit({
+      input: src, probe: info, clips: [{ start: 0, end: 2 }, { start: 3, end: 5 }], speed: 1,
+      originalVolume: 1, music: null, effects, encoders: ['libx264'], quality: 'low', outPath: fxOut,
+    });
+    const fxInfo = await media.probe(fxOut);
+    const xd = require('../src/main/edit-args').transitionLength([{ start: 0, end: 2 }, { start: 3, end: 5 }], effects.transition);
+    assert.ok(Math.abs(fxInfo.duration - (4 - xd)) < 0.1, `${key} duration ${fxInfo.duration}`);
+  }
   fs.rmSync(dir, { recursive: true, force: true });
 });

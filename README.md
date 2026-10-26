@@ -29,6 +29,21 @@ Open the **Edit** tab, or click **Edit** next to a recent recording.
   and turn the recording's own audio up, down or off.
 - **Export:** renders an MP4 using your GPU encoder when available, with a progress bar and cancel.
 
+## Style and effects
+
+The editor's side panel has **Cut**, **Style**, **Text** and **Audio** tabs.
+
+- **Flavor packs:** one click sets a whole look. Clean, Neon Arcade, Cinematic, Retro VHS, Esports and Chill.
+  Change anything afterwards to make it your own.
+- **Transitions** between clips: crossfade, dissolve, dip to black, flash, wipes, slides, circle, radial, zoom,
+  pixelize, blur, squeeze, diagonal, or "mix it up". Optional fade in/out at the start and end.
+- **Animated borders:** solid, rainbow cycle, pulse, or a drifting two-color gradient.
+- **Look:** saturation, contrast, brightness, warmth, film grain, vignette, letterbox, sharpen and VHS bleed.
+- **Text:** titles and captions with font, size, color, position, background box and fade/slide/drop animations.
+- **Logo / image:** PNG/JPG/WebP overlay with position, size and opacity.
+
+The player shows a live approximation; the export renders the exact result with FFmpeg.
+
 ## Getting the installer
 
 Every push to `main` builds the installer on GitHub Actions. Open the latest run under

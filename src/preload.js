@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
   edit: {
     pickVideo: () => ipcRenderer.invoke('edit:pick-video'),
     pickMusic: () => ipcRenderer.invoke('edit:pick-music'),
+    pickImage: () => ipcRenderer.invoke('edit:pick-image'),
     probe: (p) => ipcRenderer.invoke('edit:probe', p),
     thumbs: (p, duration, count) => ipcRenderer.invoke('edit:thumbs', p, duration, count),
     export: (opts) => ipcRenderer.invoke('edit:export', opts),
