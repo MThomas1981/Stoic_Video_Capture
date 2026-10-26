@@ -16,4 +16,14 @@ contextBridge.exposeInMainWorld('api', {
   regionDone: (rect) => ipcRenderer.send('region:done', rect),
   onStats: (cb) => ipcRenderer.on('record:stats', (_e, s) => cb(s)),
   onHotkey: (cb) => ipcRenderer.on('hotkey:toggle', () => cb()),
+  edit: {
+    pickVideo: () => ipcRenderer.invoke('edit:pick-video'),
+    pickMusic: () => ipcRenderer.invoke('edit:pick-music'),
+    probe: (p) => ipcRenderer.invoke('edit:probe', p),
+    thumbs: (p, duration, count) => ipcRenderer.invoke('edit:thumbs', p, duration, count),
+    export: (opts) => ipcRenderer.invoke('edit:export', opts),
+    cancel: () => ipcRenderer.invoke('edit:cancel'),
+    saveText: (o) => ipcRenderer.invoke('edit:save-text', o),
+    onProgress: (cb) => ipcRenderer.on('edit:progress', (_e, p) => cb(p)),
+  },
 });

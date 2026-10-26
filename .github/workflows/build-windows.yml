@@ -23,9 +23,6 @@ jobs:
 
       - run: npm ci
 
-      - name: Unit tests
-        run: npm test
-
       - name: Download FFmpeg
         run: npm run fetch-ffmpeg
         env:
@@ -47,6 +44,10 @@ jobs:
           & $ff -hide_banner -loglevel error -y -f lavfi -i sine=f=440:d=2 -c:a libopus test.webm
           & $ff -hide_banner -loglevel error -y -i test.mkv -i test.webm -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -movflags +faststart test.mp4
           if (-not (Test-Path test.mp4)) { throw 'mux failed' }
+          & resources/ffmpeg/ffprobe.exe -v error -show_entries format=duration -of csv=p=0 test.mp4
+
+      - name: Tests (unit + real FFmpeg export)
+        run: npm test
 
       - name: Build installer
         run: npx electron-builder --win --x64 --publish never

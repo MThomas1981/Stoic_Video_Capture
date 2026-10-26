@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; media-src 'self' blob: mediastream:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob: mediastream: media:">
 <title>Stoic Video Capture</title>
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -25,6 +25,12 @@
   </aside>
 
   <main class="main">
+    <div class="tabs" id="tabs">
+      <button data-view="record" class="active">Record</button>
+      <button data-view="edit">Edit</button>
+    </div>
+
+    <div id="recordView" class="view">
     <section class="hero">
       <button id="recordBtn" class="record-btn" disabled>
         <span class="dot"></span><span id="recordLabel">Start recording</span>
@@ -157,10 +163,148 @@
       </div>
       <ul id="recordings"></ul>
     </section>
+    </div>
+
+    <div id="editView" class="view hidden">
+      <div class="editor-empty" id="editorEmpty">
+        <p>Open a recording to trim it, cut clips, change speed, add music and export.</p>
+        <button class="btn primary" id="openVideo">Open video…</button>
+      </div>
+
+      <div class="editor hidden" id="editor">
+        <div class="editor-head">
+          <div>
+            <div class="file-name" id="edFileName"></div>
+            <div class="muted small" id="edFileMeta"></div>
+          </div>
+          <button class="btn" id="openVideo2">Open another…</button>
+        </div>
+
+        <div class="editor-body">
+          <div class="player-col">
+            <div class="player">
+              <video id="video" preload="auto"></video>
+            </div>
+
+            <div class="transport">
+              <div class="tc-group">
+                <input type="text" id="timecode" class="timecode" title="Type a time (h:mm:ss, mm:ss, seconds) or frame number (f123) and press Enter">
+                <div class="muted small" id="frameInfo">Frame 0 / 0</div>
+              </div>
+              <div class="tbuttons">
+                <button class="btn icon" id="tStart" title="Go to start (Home)">⏮</button>
+                <button class="btn icon" id="tBack10" title="Back 10 s (Ctrl+←)">−10s</button>
+                <button class="btn icon" id="tBack1" title="Back 1 s (Shift+←)">−1s</button>
+                <button class="btn icon" id="tPrevFrame" title="Previous frame (←)">◀ 1f</button>
+                <button class="btn play-btn" id="tPlay" title="Play / pause (Space)">▶</button>
+                <button class="btn icon" id="tNextFrame" title="Next frame (→)">1f ▶</button>
+                <button class="btn icon" id="tFwd1" title="Forward 1 s (Shift+→)">+1s</button>
+                <button class="btn icon" id="tFwd10" title="Forward 10 s (Ctrl+→)">+10s</button>
+                <button class="btn icon" id="tEnd" title="Go to end (End)">⏭</button>
+              </div>
+              <div class="tbuttons">
+                <button class="btn" id="setIn" title="Mark clip start (I)">[ In</button>
+                <button class="btn" id="setOut" title="Mark clip end (O)">Out ]</button>
+                <button class="btn primary" id="addClip" title="Add clip from In to Out (C)">+ Clip</button>
+                <button class="btn" id="addMarker" title="Add timestamp marker (M)">◆ Marker</button>
+              </div>
+            </div>
+
+            <div class="timeline-wrap">
+              <div class="timeline-tools">
+                <span class="muted small">Zoom</span>
+                <input type="range" id="zoom" min="0" max="1000" value="0" step="1">
+                <span class="muted small" id="zoomLabel">Whole video</span>
+                <label class="check small"><input type="checkbox" id="previewClips"> Play clips only</label>
+              </div>
+              <div class="timeline" id="timeline">
+                <div class="timeline-inner" id="timelineInner">
+                  <div class="ruler" id="ruler"></div>
+                  <div class="filmstrip" id="filmstrip"></div>
+                  <div class="clip-layer" id="clipLayer"></div>
+                  <div class="marker-layer" id="markerLayer"></div>
+                  <div class="inout" id="inoutRange"></div>
+                  <div class="playhead" id="playhead"><div class="playhead-knob"></div></div>
+                </div>
+              </div>
+              <div class="muted small keys">Keys: Space play · ←/→ 1 frame · Shift 1 s · Ctrl 10 s · I/O in/out · C add clip · M marker</div>
+            </div>
+          </div>
+
+          <aside class="side-col">
+            <section class="card">
+              <div class="card-head"><h2>Clips</h2><span class="muted small" id="clipsTotal"></span></div>
+              <div class="muted small" id="inoutText">In: – · Out: –</div>
+              <ul class="list" id="clipList"></ul>
+              <div class="muted small" id="clipsHint">No clips yet, so the whole video will be exported.</div>
+            </section>
+
+            <section class="card">
+              <div class="card-head"><h2>Markers</h2>
+                <button class="btn small-btn" id="exportChapters" title="Save markers as YouTube chapters">Chapters…</button></div>
+              <ul class="list" id="markerList"></ul>
+              <div class="muted small" id="markersHint">Press M or ◆ Marker to timestamp a moment.</div>
+            </section>
+
+            <section class="card">
+              <h2>Speed</h2>
+              <div class="speed-row">
+                <input type="range" id="speed" min="0.25" max="4" step="0.05" value="1">
+                <output id="speedOut">1.00×</output>
+              </div>
+              <div class="chips" id="speedChips">
+                <button data-speed="0.25">0.25×</button><button data-speed="0.5">0.5×</button>
+                <button data-speed="1">1×</button><button data-speed="1.5">1.5×</button>
+                <button data-speed="2">2×</button><button data-speed="4">4×</button>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-head"><h2>Music</h2>
+                <button class="btn small-btn" id="pickMusic">Add music…</button></div>
+              <div id="musicBox" class="hidden">
+                <div class="row"><div class="muted path" id="musicName"></div>
+                  <button class="btn icon" id="removeMusic" title="Remove music">✕</button></div>
+                <label class="field slider"><span>Music volume <output id="musicVolOut">80%</output></span>
+                  <input type="range" id="musicVol" min="0" max="2" step="0.05" value="0.8"></label>
+                <label class="field"><span>Starts at (in the final video)</span>
+                  <div class="row"><input type="text" id="musicStart" value="0:00.00">
+                  <button class="btn" id="musicAtPlayhead">Use playhead</button></div></label>
+                <div class="row two">
+                  <label class="field"><span>Fade in (s)</span><input type="number" id="musicFadeIn" min="0" step="0.5" value="1"></label>
+                  <label class="field"><span>Fade out (s)</span><input type="number" id="musicFadeOut" min="0" step="0.5" value="2"></label>
+                </div>
+                <label class="check"><input type="checkbox" id="musicLoop" checked> Loop music to fill the video</label>
+              </div>
+              <label class="field slider"><span>Recording's own audio <output id="origVolOut">100%</output></span>
+                <input type="range" id="origVol" min="0" max="2" step="0.05" value="1"></label>
+              <audio id="musicPreview" preload="auto"></audio>
+            </section>
+
+            <section class="card">
+              <h2>Export</h2>
+              <div class="muted small" id="exportSummary"></div>
+              <label class="field"><span>Quality</span>
+                <select id="exportQuality">
+                  <option value="medium">Medium (smaller file)</option>
+                  <option value="high" selected>High</option>
+                  <option value="ultra">Ultra (largest file)</option>
+                </select></label>
+              <button class="btn primary wide" id="exportBtn">Export MP4…</button>
+              <div class="progress hidden" id="exportProgress"><div id="exportBar"></div></div>
+              <div class="row hidden" id="exportRow"><span class="muted small" id="exportPct"></span>
+                <button class="btn small-btn" id="cancelExport">Cancel</button></div>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </div>
   </main>
 </div>
 <div id="toast" class="toast"></div>
 <script src="audio.js"></script>
 <script src="app.js"></script>
+<script src="timeline-math.js"></script>
+<script src="editor.js"></script>
 </body>
 </html>

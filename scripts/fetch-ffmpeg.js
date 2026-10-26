@@ -30,7 +30,7 @@ async function pickUrl() {
 
 async function main() {
   const exe = path.join(OUT_DIR, 'ffmpeg.exe');
-  if (fs.existsSync(exe) && !process.env.FFMPEG_FORCE) {
+  if (fs.existsSync(exe) && fs.existsSync(path.join(OUT_DIR, 'ffprobe.exe')) && !process.env.FFMPEG_FORCE) {
     console.log('ffmpeg.exe already present, skipping download');
     return;
   }
@@ -50,6 +50,9 @@ async function main() {
   if (!found) throw new Error('ffmpeg.exe not found in archive');
   fs.mkdirSync(OUT_DIR, { recursive: true });
   fs.copyFileSync(found, exe);
+  const probe = findFile(tmp, 'ffprobe.exe');
+  if (!probe) throw new Error('ffprobe.exe not found in archive');
+  fs.copyFileSync(probe, path.join(OUT_DIR, 'ffprobe.exe'));
   const license = findFile(tmp, 'LICENSE.txt');
   if (license) fs.copyFileSync(license, path.join(OUT_DIR, 'LICENSE.txt'));
   fs.writeFileSync(path.join(OUT_DIR, 'SOURCE.txt'), `FFmpeg binary from ${url}\nSource: https://ffmpeg.org/download.html\n`);

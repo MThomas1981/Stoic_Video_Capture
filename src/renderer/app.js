@@ -142,9 +142,10 @@ async function renderRecordings() {
   for (const r of list) {
     const li = document.createElement('li');
     li.innerHTML = '<span class="name"></span><span class="meta"></span>'
-      + '<button class="btn play">Play</button><button class="btn show">Show</button>';
+      + '<button class="btn edit">Edit</button><button class="btn play">Play</button><button class="btn show">Show</button>';
     li.querySelector('.name').textContent = r.name;
     li.querySelector('.meta').textContent = `${fmtSize(r.size)} · ${new Date(r.mtime).toLocaleString()}`;
+    li.querySelector('.edit').onclick = () => window.openInEditor(r.path);
     li.querySelector('.play').onclick = () => window.api.openFile(r.path);
     li.querySelector('.show').onclick = () => window.api.showFile(r.path);
     ul.appendChild(li);

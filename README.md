@@ -13,6 +13,22 @@ Gameplay and screen capture for Windows, built with Electron and FFmpeg.
 - **Output:** MP4 files (H.264 + AAC) in `Videos\Stoic Video Capture`. If saving fails, the raw `.mkv` is kept.
 - **Installer:** Windows setup `.exe` that adds desktop and Start menu shortcuts.
 
+## Editor (Step 2)
+
+Open the **Edit** tab, or click **Edit** next to a recent recording.
+
+- **Frame-by-frame scrubbing:** step one frame with ←/→ (or `,` `.`), 1 second with Shift, 10 seconds with Ctrl.
+  Drag on the timeline to scrub; zoom in until each frame has its own tick. Type a time (`1:23`, `0:01:23:15`)
+  or a frame (`f2000`) into the timecode box to jump straight there.
+- **Clips:** mark In (I) and Out (O), then add the clip (C). Add as many as you like, reorder them, and use
+  "Play clips only" to preview the cut. With no clips, the whole video is exported.
+- **Markers:** press M to timestamp a moment and name it. **Chapters…** saves them as YouTube chapters,
+  with times adjusted for your clips and speed.
+- **Speed:** 0.25× to 4× with the slider or the preset buttons. Audio keeps its pitch.
+- **Music:** add an MP3/M4A/WAV/OGG/FLAC track, set its volume, start point, fade in/out and looping,
+  and turn the recording's own audio up, down or off.
+- **Export:** renders an MP4 using your GPU encoder when available, with a progress bar and cancel.
+
 ## Getting the installer
 
 Every push to `main` builds the installer on GitHub Actions. Open the latest run under

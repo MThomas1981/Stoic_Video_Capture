@@ -1,11 +1,52 @@
 const {
-  app, BrowserWindow, ipcMain, screen, dialog, shell, globalShortcut, session, desktopCapturer,
+  app, BrowserWindow, ipcMain, screen, dialog, shell, globalShortcut, session, desktopCapturer, protocol,
 } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const { Readable } = require('stream');
 const { MODES, DEFAULT_SETTINGS } = require('./presets');
 const { probeCapabilities, listCameras } = require('./ffmpeg');
 const { Recorder } = require('./recorder');
+const media = require('./media');
+
+// media://local/<encoded path> serves local files to <video>/<audio> with
+// range support so the editor can seek frame by frame.
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'media', privileges: { stream: true, supportFetchAPI: true, bypassCSP: false } },
+]);
+
+const MIME = {
+  '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.mkv': 'video/x-matroska',
+  '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.aac': 'audio/aac',
+  '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.flac': 'audio/flac',
+};
+
+function serveMedia(request) {
+  const file = decodeURIComponent(new URL(request.url).pathname.slice(1));
+  if (!MIME[path.extname(file).toLowerCase()] || !fs.existsSync(file)) {
+    return new Response('Not found', { status: 404 });
+  }
+  const size = fs.statSync(file).size;
+  const type = MIME[path.extname(file).toLowerCase()];
+  const range = request.headers.get('Range');
+  const m = range && range.match(/bytes=(\d*)-(\d*)/);
+  if (!m) {
+    return new Response(Readable.toWeb(fs.createReadStream(file)), {
+      status: 200, headers: { 'Content-Type': type, 'Content-Length': String(size), 'Accept-Ranges': 'bytes' },
+    });
+  }
+  const start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
+  const end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+  return new Response(Readable.toWeb(fs.createReadStream(file, { start, end })), {
+    status: 206,
+    headers: {
+      'Content-Type': type,
+      'Content-Length': String(end - start + 1),
+      'Content-Range': `bytes ${start}-${end}/${size}`,
+      'Accept-Ranges': 'bytes',
+    },
+  });
+}
 
 const recorder = new Recorder();
 let mainWindow = null;
@@ -180,6 +221,49 @@ function registerIpc() {
     return shell.openPath(settings.outputDir);
   });
   ipcMain.handle('file:show', (_e, p) => shell.showItemInFolder(p));
+
+  // ----- editor -----
+  ipcMain.handle('edit:pick-video', async () => {
+    const res = await dialog.showOpenDialog(mainWindow, {
+      defaultPath: settings.outputDir,
+      properties: ['openFile'],
+      filters: [{ name: 'Videos', extensions: ['mp4', 'mkv', 'mov', 'webm', 'm4v'] }],
+    });
+    return res.canceled ? null : res.filePaths[0];
+  });
+  ipcMain.handle('edit:pick-music', async () => {
+    const res = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      filters: [{ name: 'Audio', extensions: ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'] }],
+    });
+    return res.canceled ? null : res.filePaths[0];
+  });
+  ipcMain.handle('edit:probe', (_e, p) => media.probe(p));
+  ipcMain.handle('edit:thumbs', (_e, p, duration, count) => media.thumbnails(p, duration, count));
+  ipcMain.handle('edit:export', async (_e, opts) => {
+    const base = path.basename(opts.input).replace(/\.[^.]+$/, '');
+    const res = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: path.join(settings.outputDir, `${base} (edited).mp4`),
+      filters: [{ name: 'MP4 video', extensions: ['mp4'] }],
+    });
+    if (res.canceled || !res.filePath) return null;
+    if (path.resolve(res.filePath) === path.resolve(opts.input)) {
+      throw new Error('Choose a different file name; the original is being read.');
+    }
+    const caps = await probeCapabilities();
+    return media.exportEdit({ ...opts, encoders: caps.encoders, outPath: res.filePath },
+      (p) => mainWindow?.webContents.send('edit:progress', p));
+  });
+  ipcMain.handle('edit:cancel', () => media.cancelExport());
+  ipcMain.handle('edit:save-text', async (_e, { suggestedName, text }) => {
+    const res = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: path.join(settings.outputDir, suggestedName),
+      filters: [{ name: 'Text', extensions: ['txt'] }],
+    });
+    if (res.canceled || !res.filePath) return null;
+    fs.writeFileSync(res.filePath, text);
+    return res.filePath;
+  });
   ipcMain.handle('file:open', (_e, p) => shell.openPath(p));
 }
 
@@ -218,6 +302,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(() => {
     settings = loadSettings();
+    protocol.handle('media', serveMedia);
     // System ("loopback") audio comes through getDisplayMedia in the renderer.
     session.defaultSession.setDisplayMediaRequestHandler(async (_req, callback) => {
       const sources = await desktopCapturer.getSources({ types: ['screen'] });

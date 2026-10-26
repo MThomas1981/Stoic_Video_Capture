@@ -115,4 +115,4 @@ function buildMuxArgs({ videoPath, audioPath, outPath, audioOffsetMs = 0 }) {
   return args;
 }
 
-module.exports = { buildRecordArgs, buildMuxArgs, pickEncoder, ENCODER_PRIORITY, even };
+module.exports = { buildRecordArgs, buildMuxArgs, pickEncoder, encoderArgs, ENCODER_PRIORITY, even };
