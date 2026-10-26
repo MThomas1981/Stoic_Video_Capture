@@ -8,6 +8,7 @@ const { MODES, DEFAULT_SETTINGS } = require('./presets');
 const { probeCapabilities, listCameras } = require('./ffmpeg');
 const { Recorder } = require('./recorder');
 const media = require('./media');
+const { listTargets } = require('./output-profiles');
 
 // media://local/<encoded path> serves local files to <video>/<audio> with
 // range support so the editor can seek frame by frame.
@@ -248,19 +249,31 @@ function registerIpc() {
   });
   ipcMain.handle('edit:probe', (_e, p) => media.probe(p));
   ipcMain.handle('edit:thumbs', (_e, p, duration, count) => media.thumbnails(p, duration, count));
+  ipcMain.handle('edit:targets', () => listTargets());
+  ipcMain.handle('edit:plan', async (_e, opts) => {
+    const caps = await probeCapabilities();
+    try {
+      return media.planExport({ ...opts, encoders: caps.encoders, hevcEncoders: caps.hevcEncoders });
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
   ipcMain.handle('edit:export', async (_e, opts) => {
+    const caps = await probeCapabilities();
+    const full = { ...opts, encoders: caps.encoders, hevcEncoders: caps.hevcEncoders };
+    const plan = media.planExport(full);
     const base = path.basename(opts.input).replace(/\.[^.]+$/, '');
+    const suffix = opts.target?.kind === 'platform' ? opts.target.id.replace(/\d+$/, '') : 'edited';
     const res = await dialog.showSaveDialog(mainWindow, {
-      defaultPath: path.join(settings.outputDir, `${base} (edited).mp4`),
-      filters: [{ name: 'MP4 video', extensions: ['mp4'] }],
+      defaultPath: path.join(settings.outputDir, `${base} (${suffix}).${plan.ext}`),
+      filters: [{ name: plan.ext.toUpperCase(), extensions: [plan.ext] }],
     });
     if (res.canceled || !res.filePath) return null;
     if (path.resolve(res.filePath) === path.resolve(opts.input)) {
       throw new Error('Choose a different file name; the original is being read.');
     }
-    const caps = await probeCapabilities();
-    return media.exportEdit({ ...opts, encoders: caps.encoders, outPath: res.filePath },
-      (p) => mainWindow?.webContents.send('edit:progress', p));
+    return media.exportEdit({ ...full, outPath: res.filePath },
+      (p, attempt) => mainWindow?.webContents.send('edit:progress', p, attempt));
   });
   ipcMain.handle('edit:cancel', () => media.cancelExport());
   ipcMain.handle('edit:save-text', async (_e, { suggestedName, text }) => {

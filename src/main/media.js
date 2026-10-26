@@ -78,29 +78,32 @@ function fontDir() {
   return '/usr/share/fonts/truetype/dejavu';
 }
 
-function exportEdit(opts, onProgress) {
-  if (currentExport) return Promise.reject(new Error('An export is already running'));
-  // drawtext reads each caption from a file, which avoids escaping problems.
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stoic-export-'));
-  const effects = opts.effects ? {
-    ...opts.effects,
-    texts: (opts.effects.texts || []).map((t, i) => {
-      const textFile = path.join(tmp, `text${i}.txt`);
-      fs.writeFileSync(textFile, String(t.text || ''));
+function prepareEffects(effects, tmp) {
+  if (!effects) return undefined;
+  return {
+    ...effects,
+    texts: (effects.texts || []).map((t, i) => {
+      const textFile = tmp ? path.join(tmp, `text${i}.txt`) : `text${i}.txt`;
+      if (tmp) fs.writeFileSync(textFile, String(t.text || ''));
       // Fall back to the bold font if this PC lacks the chosen one.
       const def = FONTS[t.font] || FONTS.bold;
       const file = path.join(fontDir(), process.platform === 'win32' ? def.win : def.linux);
       return { ...t, font: fs.existsSync(file) ? t.font : 'bold', textFile };
     }),
-  } : undefined;
-  let built;
-  try {
-    built = buildExportArgs({ ...opts, effects, fontDir: fontDir(), platform: process.platform });
-  } catch (e) {
-    fs.rmSync(tmp, { recursive: true, force: true });
-    return Promise.reject(e);
-  }
-  const { args, outputDuration, encoder } = built;
+  };
+}
+
+/** Works out what an export will produce without running it (for the UI). */
+function planExport(opts) {
+  const built = buildExportArgs({
+    ...opts, effects: prepareEffects(opts.effects, null), fontDir: fontDir(), platform: process.platform, outPath: 'out',
+  });
+  return {
+    ext: built.ext, description: built.description, warnings: built.warnings, duration: built.outputDuration,
+  };
+}
+
+function runOnce(args, outputDuration, onProgress) {
   return new Promise((resolve, reject) => {
     const proc = spawn(ffmpegPath(), args, { windowsHide: true });
     currentExport = proc;
@@ -114,20 +117,49 @@ function exportEdit(opts, onProgress) {
         onProgress?.(Math.min(1, t / outputDuration));
       }
     });
-    proc.on('error', (e) => { currentExport = null; fs.rmSync(tmp, { recursive: true, force: true }); reject(e); });
+    proc.on('error', (e) => { currentExport = null; reject(e); });
     proc.on('close', (code) => {
-      const cancelled = proc.cancelled;
       currentExport = null;
-      fs.rmSync(tmp, { recursive: true, force: true });
-      if (cancelled) {
-        fs.rmSync(opts.outPath, { force: true });
-        return reject(new Error('Export cancelled'));
-      }
-      if (code !== 0) return reject(new Error(`Export failed (${encoder}):\n${log.trim()}`));
-      onProgress?.(1);
-      resolve({ path: opts.outPath, encoder });
+      if (proc.cancelled) return reject(Object.assign(new Error('Export cancelled'), { cancelled: true }));
+      if (code !== 0) return reject(new Error(log.trim()));
+      resolve();
     });
   });
+}
+
+/**
+ * Renders an edit. For size-limited targets (Discord etc.) the file is
+ * checked afterwards and re-encoded smaller if it came out too big.
+ */
+async function exportEdit(opts, onProgress) {
+  if (currentExport) throw new Error('An export is already running');
+  // drawtext reads each caption from a file, which avoids escaping problems.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'stoic-export-'));
+  const effects = prepareEffects(opts.effects, tmp);
+  let scale = 1;
+  try {
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const built = buildExportArgs({
+        ...opts, effects, fontDir: fontDir(), platform: process.platform, bitrateScale: scale,
+      });
+      try {
+        await runOnce(built.args, built.outputDuration, (p) => onProgress?.(p, attempt));
+      } catch (e) {
+        if (e.cancelled) { fs.rmSync(opts.outPath, { force: true }); throw e; }
+        throw new Error(`Export failed (${built.encoder}):\n${e.message}`);
+      }
+      const size = fs.statSync(opts.outPath).size;
+      if (!built.targetBytes || size <= built.targetBytes) {
+        onProgress?.(1, attempt);
+        return { path: opts.outPath, encoder: built.encoder, size, description: built.description };
+      }
+      // Too big: shrink the bitrate by how much we overshot, plus a margin.
+      scale *= (built.targetBytes / size) * 0.92;
+    }
+    throw new Error('Could not get the file under the size limit. Try trimming the video.');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 function cancelExport() {
@@ -138,4 +170,4 @@ function cancelExport() {
   return true;
 }
 
-module.exports = { probe, thumbnails, exportEdit, cancelExport, ffprobePath };
+module.exports = { probe, thumbnails, exportEdit, planExport, cancelExport, ffprobePath };

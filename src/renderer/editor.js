@@ -469,6 +469,7 @@
   function renderSummary() {
     if (!ed.file) return;
     const out = TM.outputDuration(ed.clips, ed.speed, dur(), ov());
+    window.updateExportPlan?.();
     $('exportSummary').textContent = `Final length ${TM.short(out)}`
       + `${ed.clips.length ? ` from ${ed.clips.length} clip${ed.clips.length > 1 ? 's' : ''}` : ''}`
       + `${ed.speed !== 1 ? ` at ${ed.speed}×` : ''}${ed.music ? ' with music' : ''}.`;
@@ -536,9 +537,78 @@
 
   // ---------- export ----------
 
-  window.api.edit.onProgress((p) => {
+  // Export targets: platforms first, then file formats.
+  (async () => {
+    const t = await window.api.edit.targets();
+    const sel = $('exportTarget');
+    for (const [group, items, kind] of [['Platforms (auto-compressed)', t.platforms, 'platform'], ['File formats', t.formats, 'format']]) {
+      const og = document.createElement('optgroup');
+      og.label = group;
+      for (const it of items) {
+        const o = document.createElement('option');
+        o.value = `${kind}:${it.id}`;
+        o.textContent = it.label;
+        o.title = it.note;
+        og.appendChild(o);
+      }
+      sel.appendChild(og);
+    }
+    sel.value = 'format:mp4';
+    renderTargetOptions();
+  })();
+
+  function currentTarget() {
+    const [kind, id] = $('exportTarget').value.split(':');
+    return {
+      kind, id, quality: $('exportQuality').value, height: Number($('exportRes').value) || null,
+      sizeMB: Number($('exportSize').value) || null,
+    };
+  }
+
+  function exportOptions() {
+    return {
+      input: ed.file.path,
+      probe: {
+        duration: ed.file.duration, fps: ed.file.fps, hasAudio: ed.file.hasAudio, width: ed.file.width, height: ed.file.height,
+      },
+      clips: ed.clips,
+      speed: ed.speed,
+      originalVolume: ed.originalVolume,
+      music: ed.music,
+      effects: ed.effects,
+      target: currentTarget(),
+    };
+  }
+
+  function renderTargetOptions() {
+    const t = currentTarget();
+    const isFormat = t.kind === 'format';
+    $('formatOpts').classList.toggle('hidden', !isFormat || ['mp3', 'wav'].includes(t.id));
+    $('qualityField').classList.toggle('hidden', t.id === 'prores' || t.id === 'gif');
+    $('sizeField').classList.toggle('hidden', t.id !== 'custom');
+    updatePlan();
+  }
+  ['exportTarget', 'exportQuality', 'exportRes', 'exportSize'].forEach((id) => { $(id).onchange = renderTargetOptions; });
+
+  let planTimer = null;
+  function updatePlan() {
+    clearTimeout(planTimer);
+    planTimer = setTimeout(async () => {
+      if (!ed.file || !$('exportTarget').value) return;
+      const plan = await window.api.edit.plan(exportOptions());
+      const box = $('exportPlan');
+      box.classList.toggle('error', !!plan.error);
+      box.textContent = plan.error || [plan.description, ...(plan.warnings || [])].join('\n');
+      $('exportBtn').disabled = !!plan.error || ed.exporting;
+    }, 150);
+  }
+  window.updateExportPlan = updatePlan;
+
+  window.api.edit.onProgress((p, attempt) => {
     $('exportBar').style.width = `${Math.round(p * 100)}%`;
-    $('exportPct').textContent = `Exporting… ${Math.round(p * 100)}%`;
+    $('exportPct').textContent = attempt > 1
+      ? `Too big, shrinking (pass ${attempt})… ${Math.round(p * 100)}%`
+      : `Exporting… ${Math.round(p * 100)}%`;
   });
 
   $('exportBtn').onclick = async () => {
@@ -551,20 +621,10 @@
     $('exportProgress').classList.remove('hidden');
     $('exportRow').classList.remove('hidden');
     try {
-      const res = await window.api.edit.export({
-        input: ed.file.path,
-        probe: {
-          duration: ed.file.duration, fps: ed.file.fps, hasAudio: ed.file.hasAudio, width: ed.file.width, height: ed.file.height,
-        },
-        clips: ed.clips,
-        speed: ed.speed,
-        originalVolume: ed.originalVolume,
-        music: ed.music,
-        effects: ed.effects,
-        quality: $('exportQuality').value,
-      });
+      const res = await window.api.edit.export(exportOptions());
       if (res) {
-        toast(`Exported ${res.path.split(/[\\/]/).pop()}`);
+        const mb = (res.size / 1024 / 1024).toFixed(1);
+        toast(`Exported ${res.path.split(/[\\/]/).pop()} (${mb} MB)`);
         window.api.showFile(res.path);
       }
     } catch (e) {
@@ -574,6 +634,7 @@
       $('exportBtn').disabled = false;
       $('exportProgress').classList.add('hidden');
       $('exportRow').classList.add('hidden');
+      updatePlan();
     }
   };
   $('cancelExport').onclick = () => window.api.edit.cancel();

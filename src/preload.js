@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('api', {
     export: (opts) => ipcRenderer.invoke('edit:export', opts),
     cancel: () => ipcRenderer.invoke('edit:cancel'),
     saveText: (o) => ipcRenderer.invoke('edit:save-text', o),
-    onProgress: (cb) => ipcRenderer.on('edit:progress', (_e, p) => cb(p)),
+    targets: () => ipcRenderer.invoke('edit:targets'),
+    plan: (opts) => ipcRenderer.invoke('edit:plan', opts),
+    onProgress: (cb) => ipcRenderer.on('edit:progress', (_e, p, attempt) => cb(p, attempt)),
   },
 });

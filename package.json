@@ -1,7 +1,7 @@
 {
   "name": "stoic-video-capture",
   "productName": "Stoic Video Capture",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Gameplay and screen capture for Windows",
   "main": "src/main/main.js",
   "author": "Matt Thomas",

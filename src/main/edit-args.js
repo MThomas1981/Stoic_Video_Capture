@@ -3,7 +3,10 @@
 // (look, text, logo, animated border) and mix in music. Pure function so it
 // can be tested anywhere.
 
-const { encoderArgs, pickEncoder, even } = require('./ffmpeg-args');
+const { even } = require('./ffmpeg-args');
+const {
+  resolveOutput, videoCodecArgs, audioCodecArgs, pixFmtFor, describe,
+} = require('./output-profiles');
 const {
   DEFAULT_EFFECTS, DEFAULT_LOOK, RANDOM_POOL, FONTS, TEXT_SIZES,
 } = require('../renderer/flavors');
@@ -122,10 +125,12 @@ function borderSource(border, w, h, fps) {
  * @param {object} o.effects     see Flavors.DEFAULT_EFFECTS; texts need a prepared textFile
  * @param {string} o.fontDir     folder holding the TTF fonts
  * @param {string} o.platform    process.platform (picks font file names)
- * @param {string[]} o.encoders  available encoders
- * @param {string} o.quality     low | medium | high | ultra
+ * @param {string[]} o.encoders  available H.264 encoders (o.hevcEncoders for H.265)
+ * @param {object} o.target      { kind: 'format'|'platform', id, quality, height, sizeMB }
+ * @param {number} o.bitrateScale shrink factor when retrying a size target
+ * @param {string} o.quality     low | medium | high | ultra (when no target is given)
  * @param {string} o.outPath
- * @returns {{ args: string[], outputDuration: number, encoder: string }}
+ * @returns {{ args, outputDuration, encoder, ext, targetBytes, description, warnings }}
  */
 function buildExportArgs(o) {
   const { input, probe, outPath } = o;
@@ -142,7 +147,6 @@ function buildExportArgs(o) {
   const keepOrig = probe.hasAudio && origVol > 0;
   const music = o.music && o.music.path ? o.music : null;
   const logo = fx.logo && fx.logo.path ? fx.logo : null;
-  const encoder = pickEncoder('auto', o.encoders || []);
 
   const args = ['-hide_banner', '-loglevel', 'warning', '-stats', '-y', '-i', input];
   let nextInput = 1;
@@ -225,8 +229,33 @@ function buildExportArgs(o) {
     v = '[vb]';
   }
 
-  const pixFmt = encoder === 'h264_qsv' ? 'nv12' : 'yuv420p';
-  f.push(`${v}format=${pixFmt}[vout]`);
+  // Output target: scaling, vertical layout, frame-rate cap, GIF palette.
+  const out = resolveOutput({
+    target: o.target || { kind: 'format', id: 'mp4', quality: o.quality || 'high' },
+    source: { width: W, height: H, fps },
+    duration: total,
+    caps: { encoders: o.encoders || [], hevcEncoders: o.hevcEncoders || [] },
+    bitrateScale: o.bitrateScale || 1,
+  });
+  if (out.video && out.vertical) {
+    f.push(`${v}split=2[vbg0][vfg0]`,
+      '[vbg0]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:2[vbg1]',
+      '[vfg0]scale=1080:1920:force_original_aspect_ratio=decrease[vfg1]',
+      '[vbg1][vfg1]overlay=x=(W-w)/2:y=(H-h)/2[vvert]');
+    v = '[vvert]';
+  }
+  const tail = [];
+  if (out.fps) tail.push(`fps=${out.fps}`);
+  if (out.height) tail.push(`scale=-2:${out.height}:flags=lanczos`);
+  if (out.video === 'gif') {
+    f.push(`${v}${tail.length ? `${tail.join(',')},` : ''}split[g1][g2]`,
+      '[g1]palettegen=stats_mode=diff[pal]', '[g2][pal]paletteuse=dither=bayer:bayer_scale=4[vout]');
+  } else if (out.video) {
+    tail.push(`format=${pixFmtFor(out)}`);
+    f.push(`${v}${tail.join(',')}[vout]`);
+  } else {
+    f.push(`${v}nullsink`); // audio-only export: the picture goes nowhere
+  }
 
   const stereo = 'aformat=sample_rates=48000:channel_layouts=stereo';
   if (a) {
@@ -260,15 +289,24 @@ function buildExportArgs(o) {
     a = '[aout]';
   }
 
-  args.push('-filter_complex', f.join(';'), '-map', '[vout]');
-  if (a) args.push('-map', a, '-c:a', 'aac', '-b:a', '192k');
+  if (!out.video && !a) throw new Error('This video has no sound to export');
+  if (a && !out.audio) f.push(`${a}anullsink`); // e.g. GIF: the sound goes nowhere
+  args.push('-filter_complex', f.join(';'));
+  if (out.video) args.push('-map', '[vout]', ...videoCodecArgs(out, out.fps || fps));
+  else args.push('-vn');
+  if (a && out.audio) args.push('-map', a, ...audioCodecArgs(out));
   else args.push('-an');
-
-  const enc = encoder === 'libx264'
-    ? ['-c:v', 'libx264', '-preset', 'medium', '-crf', String({ low: 28, medium: 23, high: 20, ultra: 17 }[o.quality] ?? 20), '-g', String(fps * 2)]
-    : encoderArgs(encoder, o.quality || 'high', fps, false);
-  args.push(...enc, '-movflags', '+faststart', '-t', num(total), outPath);
-  return { args, outputDuration: total, encoder };
+  if (out.ext === 'mp4' || out.ext === 'mov') args.push('-movflags', '+faststart');
+  args.push('-t', num(total), outPath);
+  return {
+    args,
+    outputDuration: total,
+    encoder: out.encoder || out.audio,
+    ext: out.ext,
+    targetBytes: out.targetBytes,
+    description: describe(out, { height: H, fps }),
+    warnings: out.warnings,
+  };
 }
 
 module.exports = {

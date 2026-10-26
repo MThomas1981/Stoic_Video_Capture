@@ -44,6 +44,19 @@ The editor's side panel has **Cut**, **Style**, **Text** and **Audio** tabs.
 
 The player shows a live approximation; the export renders the exact result with FFmpeg.
 
+## Export and convert (Step 3)
+
+Open any video in the Edit tab (edits are optional) and pick **Export for**:
+
+- **Platforms, auto-compressed:** YouTube (recommended bitrates, keeps 4K), Steam (1080p), Twitch (1080p),
+  X/Twitter (1080p, under 512 MB), TikTok / Shorts / Reels (1080×1920 vertical with a blurred fill),
+  Discord 10 MB / 50 MB / 500 MB, or any custom size. Size-limited exports are checked afterwards and
+  automatically re-encoded smaller if they come out too big.
+- **File formats:** MP4 (H.264 or H.265), MOV, MKV, WebM (VP9), ProRes 422 HQ, animated GIF, MP3 or WAV,
+  with quality and resolution choices.
+
+The panel shows exactly what you'll get (resolution, frame rate, codec, bitrate, size) before you export.
+
 ## Getting the installer
 
 Every push to `main` builds the installer on GitHub Actions. Open the latest run under

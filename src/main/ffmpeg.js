@@ -44,9 +44,12 @@ function probeCapabilities() {
         return { ok: false, error: 'FFmpeg was not found', ddagrab: false, encoders: [] };
       }
       const ddagrab = process.platform === 'win32' && /\bddagrab\b/.test(filters.out);
-      const results = await Promise.all(ENCODER_PRIORITY.map(async (e) => [e, await testEncoder(e)]));
-      const encoders = results.filter(([, ok]) => ok).map(([e]) => e);
-      return { ok: true, ddagrab, encoders, path: ffmpegPath() };
+      const test = async (list) => (await Promise.all(list.map(async (e) => [e, await testEncoder(e)])))
+        .filter(([, ok]) => ok).map(([e]) => e);
+      const [encoders, hevcEncoders] = await Promise.all([
+        test(ENCODER_PRIORITY), test(['hevc_nvenc', 'hevc_amf', 'hevc_qsv', 'libx265']),
+      ]);
+      return { ok: true, ddagrab, encoders, hevcEncoders, path: ffmpegPath() };
     })();
   }
   return capsPromise;

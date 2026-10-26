@@ -167,7 +167,7 @@
 
     <div id="editView" class="view hidden">
       <div class="editor-empty" id="editorEmpty">
-        <p>Open a recording to trim it, cut clips, change speed, add music and export.</p>
+        <p>Open a recording to trim, style, convert or compress it for YouTube, Discord and more.</p>
         <button class="btn primary" id="openVideo">Open video…</button>
       </div>
 
@@ -367,13 +367,26 @@
             <section class="card">
               <h2>Export</h2>
               <div class="muted small" id="exportSummary"></div>
-              <label class="field"><span>Quality</span>
-                <select id="exportQuality">
-                  <option value="medium">Medium (smaller file)</option>
-                  <option value="high" selected>High</option>
-                  <option value="ultra">Ultra (largest file)</option>
-                </select></label>
-              <button class="btn primary wide" id="exportBtn">Export MP4…</button>
+              <label class="field"><span>Export for</span><select id="exportTarget"></select></label>
+              <div class="row two" id="formatOpts">
+                <label class="field" id="qualityField"><span>Quality</span>
+                  <select id="exportQuality">
+                    <option value="medium">Medium</option>
+                    <option value="high" selected>High</option>
+                    <option value="ultra">Ultra</option>
+                  </select></label>
+                <label class="field" id="resField"><span>Resolution</span>
+                  <select id="exportRes">
+                    <option value="">Same as video</option>
+                    <option value="2160">2160p 4K</option><option value="1440">1440p</option>
+                    <option value="1080">1080p</option><option value="720">720p</option>
+                    <option value="480">480p</option><option value="360">360p</option>
+                  </select></label>
+              </div>
+              <label class="field hidden" id="sizeField"><span>Max file size (MB)</span>
+                <input type="number" id="exportSize" min="1" step="1" value="25"></label>
+              <div class="plan" id="exportPlan"></div>
+              <button class="btn primary wide" id="exportBtn">Export…</button>
               <div class="progress hidden" id="exportProgress"><div id="exportBar"></div></div>
               <div class="row hidden" id="exportRow"><span class="muted small" id="exportPct"></span>
                 <button class="btn small-btn" id="cancelExport">Cancel</button></div>
